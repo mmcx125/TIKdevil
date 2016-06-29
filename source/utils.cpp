@@ -691,3 +691,111 @@ void clear_screen(gfxScreen_t screen)
     gfxSwapBuffers();
     gspWaitForVBlank();
 }
+
+bool download_JSON() {
+  printf("\nAttempting to download JSON...\n");
+  
+  remove("/TIKdevil/horns.json.tmp");
+  FILE *oh = fopen("/TIKdevil/horns.json.tmp", "wb");
+  
+  if (oh) {
+    Result res = DownloadFile(JSON_URL, oh, false);
+    int size = ftell(oh);
+    fclose(oh);
+    if (res == 0 && size >= 0) {
+      remove("/TIKdevil/horns.json");
+      rename("/TIKdevil/horns.json.tmp", "/TIKdevil/horns.json");
+      return true;
+    }
+  }
+  
+  printf("Failed to download JSON");
+  return false;
+}
+
+bool check_JSON(bool forceUpdate = true) {
+    struct stat filestats;
+    int ret = stat("/TIKdevil/horns.json", &filestats);
+
+    if (ret == 0) {
+      if (forceUpdate == true) {
+        return download_JSON();
+      }
+    } else {
+      printf("No horns.json\n");
+
+      printf("\nPress A to Download, or any other key to exit.\n");
+      u32 keys = wait_key();
+      
+      if (keys & KEY_A) {
+        return download_JSON();
+      }
+      return false;
+    }
+
+    return true;
+}
+
+std::string GetSystemRegion()
+{
+	u8 region = -1;
+	CFGU_SecureInfoGetRegion(&region);
+
+	if(region == CFG_REGION_JPN)
+		return "JPN";
+	
+	if(region == CFG_REGION_USA)
+		return "USA";
+	
+	if(region == CFG_REGION_EUR)
+		return "EUR";
+	
+	if(region == CFG_REGION_AUS)
+		return "EUR";
+	
+	if(region == CFG_REGION_CHN)
+		return "CHN";
+	
+	if(region == CFG_REGION_KOR)
+		return "KOR";
+	
+	if(region == CFG_REGION_TWN)
+		return "TWN";
+	
+	return "REGION FREE ONLY";
+}
+std::string GetSerialType(std::string sSerial)
+{
+    std::string sType = "Unknown";
+    if (sSerial.substr(0, 3) == "TWL")
+    {
+        sType = "DSiWare";
+    }
+    else
+    {
+        switch (sSerial.c_str()[4])
+        {
+            case 'N':
+            case 'P':
+                sType = "Game";
+                break;
+            case 'T':
+                sType = "Demo";
+                break;
+            case 'U':
+                sType = "Update";
+                break;
+            case 'M':
+                sType = "DLC";
+                break;
+        }
+    }
+
+    return sType;
+}
+
+std::string upperCase(std::string input) {
+  for (std::string::iterator it = input.begin(); it != input.end(); ++ it)
+    *it = toupper(*it);
+  return input;
+}

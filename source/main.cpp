@@ -27,16 +27,16 @@
 
 #include <3ds.h>
 
-#include "tinyxml2.h"
 #include "utils.h"
 #include "data.h"
 #include "menu.h"
-
+#include "json/json.h"
 
 static const u16 top = 0x140;
 static std::string region = "ALL";
 static bool bExit = false;
-
+int sourceDataType;
+Json::Value sourceData;
 
 std::string upper(std::string s)
 {
@@ -100,20 +100,17 @@ char* parse_string(const std::string & s)
     return buffer;
 }
 
-void CreateTicket(std::string titleId, std::string encTitleKey, char* titleVersion, std::string outputFullPath)
+std::string GetTicket(std::string titleId, std::string encTitleKey, char* titleVersion)
 {
-    std::ofstream ofs;
-    ofs.open(outputFullPath, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
+    std::ostringstream ofs;
     ofs.write(tikTemp, 0xA50);
-    ofs.close();
-    ofs.open(outputFullPath, std::ofstream::out | std::ofstream::in | std::ofstream::binary);
     ofs.seekp(top+0xA6, std::ios::beg);
     ofs.write(titleVersion, 0x2);
     ofs.seekp(top+0x9C, std::ios::beg);
     ofs.write(parse_string(titleId), 0x8);
     ofs.seekp(top+0x7F, std::ios::beg);
     ofs.write(parse_string(encTitleKey), 0x10);
-    ofs.close();
+    return ofs.str();
 }
 
 
@@ -140,6 +137,23 @@ std::string ToHex(const std::string& s)
         ret << std::hex << std::setfill('0') << std::setw(2) << z;
     }
     return ret.str();
+}
+
+
+void load_JSON_data() 
+{
+    printf("loading horns.json...\n");
+    std::ifstream ifs("/TIKdevil/horns.json");
+    Json::Reader reader;
+    Json::Value obj;
+    reader.parse(ifs, obj);
+    sourceData = obj; // array of characters
+    
+    if(sourceData[0]["titleID"].isString()) {
+      sourceDataType = JSON_TYPE_ONLINE;
+    } else if (sourceData[0]["titleid"].isString()) {
+      sourceDataType = JSON_TYPE_HORNS;
+    }
 }
 
 
@@ -181,119 +195,62 @@ std::vector<std::string> util_get_installed_tickets()
 	return vTickets;
 }
 
-void action_download()
-{
-	printf("Downloading 3ds.titlekeys.com page...");
-	
-	mkpath("/TIKdevil/", 0777);
-	mkpath("/TIKdevil/tickets/", 0777);
-	FILE *oh = fopen("/TIKdevil/fullpage", "wb");
-	Result sres = DownloadFile("https://3ds.titlekeys.com/", oh, true);
-	fclose(oh);
-	if (sres != 0)
-	{
-		printf("Could not download file.\n");
-	}
-	
-	printf("done!\n\n");
-}
-
-void action_table_strip()
-{
-	printf("Stripping table...\n");
-	printf("  Phase 1...");
-	std::string divBuffer = get_file_contents("/TIKdevil/fullpage");
-	std::string buf = divBuffer.substr((divBuffer.find("</thead>")  + 8), (divBuffer.find("</table>") - divBuffer.find("</thead>")));
-	int totSize = buf.size();
-	int lastPrint=0;
-	printf("done!\n\n");
-	
-	printf("   Phase 2...\n   ");
-	while(buf.find("<button class=\"clipboard btn btn-info btn-sm\"><span class=\"glyphicon glyphicon-copy\"></span></button>") != std::string::npos)
-	{
-		int curPos = buf.find("<button class=\"clipboard btn btn-info btn-sm\"><span class=\"glyphicon glyphicon-copy\"></span></button>");
-		buf.erase(buf.find("<button class=\"clipboard btn btn-info btn-sm\"><span class=\"glyphicon glyphicon-copy\"></span></button>"), 101);
-		int progress=curPos*100/totSize;
-		if((progress%10==0 and progress>lastPrint)or(progress==0 and lastPrint==0)){
-			printf("%d%% ", progress);
-			lastPrint = progress+1;
-		}
-	}
-	printf("100%%\n   Done!\n\n    Phase 3...\n    ");
-	lastPrint=0;
-	while(buf.find("<button class=\"qr btn btn-info btn-sm\"><span class=\"glyphicon glyphicon-qrcode\"></span></button>") != std::string::npos)
-	{
-		int curPos = buf.find("<button class=\"qr btn btn-info btn-sm\"><span class=\"glyphicon glyphicon-qrcode\"></span></button>");
-		buf.erase(buf.find("<button class=\"qr btn btn-info btn-sm\"><span class=\"glyphicon glyphicon-qrcode\"></span></button>"), 96);
-		int progress=curPos*100/totSize;
-		if((progress%10==0 and progress>lastPrint)or(progress==0 and lastPrint==0)){
-			printf("%d%% ", progress);
-			lastPrint = progress+1;
-		}
-	}
-	printf("100%%\n    Done!\n\nWriting to file...");
-	FILE *fp = fopen ("/TIKdevil/table", "w+");
-	fprintf(fp, "%s", buf.c_str());
-	fclose(fp);
-	printf("done!\n\n");
-}
-
 
 void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<std::string> &vTitleID, std::vector<std::string> &vTitleRegion, int &n, std::string regionFilter, bool del)
 {
-	printf("Checking for already installed tiks...\n");
-	tinyxml2::XMLDocument xmlDoc;
-    xmlDoc.LoadFile( "/TIKdevil/table" );
+	// Set up the reading of json
+	if (check_JSON(del == false))
+	{
+		load_JSON_data();
+	} else
+		return;
+	
+	if(del == false){
+		printf("Checking for already installed tiks...\n\n");
+	} else {
+		printf("Checking for out of region tiks...\n\n");
+	}
+  
+	n = 0;
 	
 	std::vector<std::string> vNANDTiks = util_get_installed_tickets();
 	
-	tinyxml2::XMLElement * pTR = xmlDoc.FirstChildElement("tr");
 	const char*  ctitleId = nullptr;
 	const char*  cencTitleKey = nullptr;
-	const char*  ctitleType = nullptr;
 	const char*  ctitleName = nullptr;
-	const char*  ctitleRegion = nullptr;
 	
+	std::string titleType;
 	std::string titleId;
 	std::string encTitleKey;
 	std::string titleRegion;
 	std::string curTik;
-	
-	while (pTR != nullptr)
-	{
-		int i=1;
-		tinyxml2::XMLElement * pTD = pTR->FirstChildElement("td");
-		while (pTD != nullptr)
+	bool isNotSystemTitle;
+	int dellastPrint = 0;
+	int index = sourceData.size() - 1;
+	for (unsigned int i = 0; i < sourceData.size(); i++) {
+		// Check that the encTitleKey isn't null
+		if (sourceData[i]["encTitleKey"].isNull())
 		{
-			const char* sOut = pTD->GetText();
-			switch (i)
-			{
-				case(1):
-					ctitleId = sOut;
-				break;
-				case(3):
-					cencTitleKey = sOut;
-				break;
-				case(4):
-					ctitleType = sOut;
-				break;
-				case(5):
-					ctitleName = sOut;
-				break;
-				case(6):
-					ctitleRegion = sOut;
-				break;
-			}
-			pTD = pTD->NextSiblingElement("td");
-			i++;
+			continue;
 		}
+		ctitleId = sourceData[i]["titleID"].asCString();
+		cencTitleKey = sourceData[i]["encTitleKey"].asCString();
+		ctitleName = sourceData[i]["name"].asCString();
+		
+		titleRegion = sourceData[i]["region"].asString();
+		titleType = sourceData[i]["titleID"].asString().substr(4,4);
+		
+		isNotSystemTitle = (titleType == ESHOP_GAMEAPP or titleType == ESHOP_DLC or titleType == ESHOP_DSIWARE);
+		
 		if(del == false)
 		{
 			
-			if(strcmp(regionFilter.c_str(), "ALL"))
+			if(regionFilter != "ALL")
 			{
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and (not(strcmp(ctitleType, "eShop/Application")) or not(strcmp(ctitleType, "DLC"))) and(not(strcmp(ctitleRegion, regionFilter.c_str()))))
+				// a specific region is selected
+				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true and (titleRegion == regionFilter || titleRegion == "ALL" || titleRegion == ""))
 				{
+					// add it if it isn't a system title and the region matches
 					titleId = ctitleId;
 					bool found = false;
 					for(unsigned int foo =0; foo < vNANDTiks.size(); foo++)
@@ -311,7 +268,6 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 						
 						encTitleKey = cencTitleKey;
 						encTitleKey.erase(remove_if(encTitleKey.begin(), encTitleKey.end(), isspace), encTitleKey.end());
-						titleRegion = ctitleRegion;
 						
 						vTitleID.push_back(titleId);
 						vEncTitleKey.push_back(encTitleKey);
@@ -319,8 +275,9 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 					}
 				}
 			} else {
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and (not(strcmp(ctitleType, "eShop/Application")) or not(strcmp(ctitleType, "DLC"))))
+				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true)
 				{
+					// add anything that isn't a system title ticket
 					titleId = ctitleId;
 					bool found = false;
 					for(unsigned int foo =0; foo < vNANDTiks.size(); foo++)
@@ -343,65 +300,58 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 				}
 			}
 		} else {
+			
 			u64 curr;
-			if(strcmp(regionFilter.c_str(), "ALL"))
+			if(regionFilter != "ALL")
 			{
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and (not(strcmp(ctitleType, "eShop/Application")) or not(strcmp(ctitleType, "DLC"))) and(strcmp(ctitleRegion, regionFilter.c_str())))
+				// If region is not ALL
+				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true and ((regionFilter != "REGION FREE" && titleRegion != regionFilter && titleRegion != "ALL" && titleRegion != "") || (regionFilter == "REGION FREE" && (titleRegion != "ALL" && titleRegion != ""))))
 				{
+					// If region matches selection and it not a system title
 					n++;
 					curr = strtoull(ctitleId, NULL, 16) ;
 					AM_DeleteTicket(curr);
 				}
 			} else {
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and (not(strcmp(ctitleType, "eShop/Application")) or not(strcmp(ctitleType, "DLC"))))
+				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true)
 				{
+					// This isn't a system title ticket, remove it
 					n++;
 					curr = strtoull(ctitleId, NULL, 16) ;
 					AM_DeleteTicket(curr);
 				}
 			}
-		}
-		pTR = pTR->NextSiblingElement("tr");
-	}
-	if(del==false)printf("Missing tickets: %d\n\n", n);
-	else if(del==true)printf("Deleted tickets: %d\n\n", n);
-}
-
-void action_generate(std::vector<std::string> vEncTitleKey,std::vector<std::string> vTitleID, int index)
-{
-	printf("Generating missing tickets...\n  ");
-	char titleVersion[2] = {0x00, 0x00};
-	int genlastPrint = 0;
-	for (unsigned int i =0; i < vTitleID.size(); i++)
-	{
-		CreateTicket(vTitleID.at(i), vEncTitleKey.at(i), titleVersion, "/TIKdevil/tickets/" + vTitleID.at(i) + ".tik");
-		int genprogress = i*100/index;
-		if((genprogress%10==0 and genprogress>genlastPrint)or(genprogress==0 and genlastPrint==0)){
-			printf("%d%% ", genprogress);
-			genlastPrint = genprogress+1;
+			int delprogress = i*100/index;
+			if((delprogress%10==0 and delprogress>dellastPrint)or(delprogress==0 and dellastPrint==0)){
+				printf("%d%% ", delprogress);
+				dellastPrint = delprogress+1;
+			}
 		}
 	}
-	printf("100%%\n  Done!\n\n");
-}
-
-
-
-void action_install(std::vector<std::string> vTitleID, int index)
-{
-	printf("Installing Tickets...\n  ");
 	
+	if(del==false){
+		printf("Missing tickets: %d\n\n", n);
+	} else if(del==true){
+		printf("100%%\n\n");
+		printf("Deleted tickets: %d\n\n", n);
+	}
+}
+
+void action_install(std::vector<std::string> vEncTitleKey,std::vector<std::string> vTitleID, int index)
+{
+	printf("Installing missing tickets...\n\n");
+	char titleVersion[2] = {0x00, 0x00};
 	Handle hTik;
 	u32 writtenbyte;
 	int instlastPrint = 0;
 	for (unsigned int i =0; i < vTitleID.size(); i++)
 	{
-		std::string cID = "/TIKdevil/tickets/";
-		cID.append(vTitleID.at(i));
-		cID.append(".tik");
+		
 		AM_InstallTicketBegin(&hTik);
-		std::string curr = get_file_contents(cID.c_str());
+		std::string curr = GetTicket(vTitleID.at(i), vEncTitleKey.at(i), titleVersion);
 		FSFILE_Write(hTik, &writtenbyte, 0, curr.c_str(), 0x150000, 0);
 		AM_InstallTicketFinish(hTik);
+		
 		int instprogress = i*100/index;
 		if((instprogress%10==0 and instprogress>instlastPrint)or(instprogress==0 and instlastPrint==0)){
 			printf("%d%% ", instprogress);
@@ -411,19 +361,6 @@ void action_install(std::vector<std::string> vTitleID, int index)
 	printf("100%%\n  Done!\n\n");
 }
 
-void action_clean(std::vector<std::string> vTitleID)
-{
-	printf("Cleaning temp files...");
-	for (unsigned int i =0; i < vTitleID.size(); i++)
-	{
-		std::string rem = "/TIKdevil/tickets/";
-		rem.append(vTitleID.at(i));
-		rem.append(".tik");
-		remove(rem.c_str());
-	}
-	
-	printf("done!\n");
-}
 
 void action_about()
 {
@@ -432,37 +369,44 @@ void action_about()
 	printf(CONSOLE_RED "\n\n\n  TIKdevil by Kyraminol\n\n" CONSOLE_RESET);
     printf("    Generate only missing tickets\n");
     printf("    and directly install them!\n\n\n");
-    printf(CONSOLE_BLUE "  Special thanks to:\n");
-	printf("   cearp, Drakia, steveice10, Mmcx125.\n" CONSOLE_RESET);
+    printf(CONSOLE_BLUE "  Special thanks to:\n\n" CONSOLE_RESET);
+	printf("    cearp, Drakia, steveice10, Mmcx125,\n    and DanTheMan827.\n" CONSOLE_RESET);
     wait_key_specific("\n\n  Press A to continue.\n", KEY_A);
 }
 
 void action_toggle_region()
 {
-	if(region == "ALL")region = "EUR"; 
+	if(region == "REGION FREE")region = "ALL"; 
+	else if(region == "ALL") region = "EUR";
 	else if(region == "EUR") region = "USA";
 	else if(region == "USA") region = "JPN";
-	else if(region == "JPN") region = "ALL";
+	else if(region == "JPN") region = "CHN";
+	else if(region == "CHN") region = "KOR";
+	else if(region == "KOR") region = "TWN";
+	else if(region == "TWN") region = "REGION FREE";
 }
 
-int action_getconfirm(){
+int action_getconfirm(bool removing){
 	int ret = 0;
-	char msg[32];
-	/* Commenting out due to missing code handling other regions.
-	sprintf(msg, "Region set to %s are you sure?", region.c_str());
-	if(region=="ALL"){
-	    const char *confirm[] = {
-			"No! Return me to main menu.",
-			"Yes, but select EUR.",
-			"Yes, but select USA.",
-			"Yes, but select JPN.",
+
+	char msg[72];
+	
+	if(region == "ALL"){
+		sprintf(msg, "Region set to ALL are you sure?");
+			const char *confirm[] = {
+			"No, take me to main menu.",
+			"No, I only want EUR.",
+			"No, I only want USA.",
+			"No, I only want JPN.",
+			"No, I only want CHN.",
+			"No, I only want KOR.",
+			"No, I only want TWN.",
+			"No, I only want region free.",
 			"ARR ARR SELECT THEM ALL."
 		};
-		char foo[2];
 		while(ret==0)
 		{
-			sprintf(foo, " ");
-			int result = menu_draw(msg, foo, 0, sizeof(confirm) / sizeof(char*), confirm);
+			int result = menu_draw(msg, " ", 0, sizeof(confirm) / sizeof(char*), confirm);
 			switch (result)
 			{
 				case 0:
@@ -474,45 +418,51 @@ int action_getconfirm(){
 				case 3:
 					ret=1; region = "JPN"; break;
 				case 4:
+					ret=1; region = "CHN"; break;
+				case 5:
+					ret=1; region = "KOR"; break;
+				case 6:
+					ret=1; region = "TWN"; break;
+				case 7:
+					ret=1; region = "REGION FREE"; break;
+				case 8:
 					ret=1; break;
 			}
 			clear_screen(GFX_BOTTOM);
 		}
 		consoleClear();
 	} else {
-		const char *confirm[] = {
-			"No! Return me to main menu.",
-			"Yes, continue with my selection.",
-			"Yes, but select EUR.",
-			"Yes, but select USA.",
-			"Yes, but select JPN.",
-			"ARR ARR SELECT THEM ALL."
-		};
-		char foo[2];
-		while(ret==0)
-		{
-			
-			sprintf(foo, " ");
-			int result = menu_draw(msg, foo, 0, sizeof(confirm) / sizeof(char*), confirm);
-			switch (result)
-			{
-				case 0:
-					ret=-1; break;
-				case 1:
-					ret=1; break;
-				case 2:
-					ret=1; region = "EUR"; break;
-				case 3:
-					ret=1; region = "USA"; break;
-				case 4:
-					ret=1; region = "JPN"; break;
-				case 5:
-					ret=1; region = "ALL"; break;
-			}
-			clear_screen(GFX_BOTTOM);
+		printf("Region set to %s, press A to continue,\nor any other to cancel.", region.c_str());
+		u32 keys = wait_key();
+		if (keys & KEY_A) {
+			ret = 1;
+		} else {
+			ret = -1;
 		}
 		consoleClear();
-	} */
+	}
+
+	if(removing == true && region == "ALL"){
+		printf(CONSOLE_RED "\nDanger, Will Robinson!\nThis will remove ALL tickets\nincluding ones for your region!" CONSOLE_RESET "\n\nPress A to continue,\nor any other to cancel.\n\n");
+      u32 keys = wait_key();
+      
+      if (keys & KEY_A) {
+        ret = 1;
+      } else {
+				ret = -1;
+			}
+	}
+	if(removing == true && region == "REGION FREE"){
+		printf(CONSOLE_RED "\nDanger, Will Robinson!\nThis will remove everything except region free\ntickets, this may include ones you have installed!" CONSOLE_RESET "\n\nPress A to continue,\nor any other to cancel.\n\n");
+      u32 keys = wait_key();
+      
+      if (keys & KEY_A) {
+        ret = 1;
+      } else {
+				ret = -1;
+			}
+	}
+	
 	return ret;
 }
 
@@ -521,18 +471,14 @@ int action_getconfirm(){
 void select_oneclick()
 {
 	consoleClear();
-	int w = action_getconfirm();
+	int w = action_getconfirm(false);
 	if(w<0)return;
-	action_download();
-	action_table_strip();
 	std::vector<std::string> Keys;
 	std::vector<std::string> IDs;
 	std::vector<std::string> Regions;
 	int n;
 	action_missing_tickets(Keys, IDs, Regions, n, region, false);
-	action_generate(Keys, IDs, n);
-	action_install(IDs, n);
-	action_clean(IDs);
+	action_install(Keys, IDs, n);
 	wait_key_specific("\n  Press A to continue.\n", KEY_A);
 }
 
@@ -540,7 +486,7 @@ void select_oneclick()
 
 void select_removeout(){
 	consoleClear();
-	int w = action_getconfirm();
+	int w = action_getconfirm(true);
 	if(w<0)return;
 	printf("Deleting selected tickets...\n");
 	std::vector<std::string> Keys;
@@ -612,11 +558,20 @@ int main(int argc, const char* argv[])
     socInit(soc_sharedmem, soc_sharedmem_size);
     sslcInit(0);
 	amInit();
+    cfguInit();
     AM_InitializeExternalTitleDatabase(false);
 
     init_menu(GFX_TOP);
+    
+    // Make sure the TIKdevil directory exists on the SD card
+    mkpath("/TIKdevil/", 0777);
+    
+    // Load the region from system secure info
+    region = GetSystemRegion();
+    
     menu_main();
 	
+    cfguExit();
 	amExit();
     gfxExit();
     httpcExit();
