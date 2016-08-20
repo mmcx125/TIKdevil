@@ -28,7 +28,7 @@
 #include <3ds.h>
 
 #include "utils.h"
-#include "launcheshop.h"
+#include "eshop.h"
 #include "data.h"
 #include "menu.h"
 #include "json/json.h"
@@ -41,173 +41,183 @@ Json::Value sourceData;
 
 std::string upper(std::string s)
 {
-  std::string ups;
+    std::string ups;
 
-  for(unsigned int i = 0; i < s.size(); i++)
-  {
-	ups.push_back(std::toupper(s[i]));
-  }
+    for(unsigned int i = 0; i < s.size(); i++)
+    {
+        ups.push_back(std::toupper(s[i]));
+    }
 
-  return ups;
+    return ups;
 }
 
 struct display_item {
-  int ld;
-  int index;
+    int ld;
+    int index;
 };
 
 bool compareByLD(const display_item &a, const display_item &b)
 {
-	return a.ld < b.ld;
+    return a.ld < b.ld;
 }
 
-bool FileExists (std::string name){
-	struct stat buffer;
-	return (stat (name.c_str(), &buffer) == 0);
+bool FileExists (std::string name)
+{
+    struct stat buffer;
+    return (stat (name.c_str(), &buffer) == 0);
 }
 
 int mkpath(std::string s,mode_t mode)
 {
-	size_t pre=0,pos;
-	std::string dir;
-	int mdret = 0;
-	if(s[s.size()-1]!='/'){
-		s+='/';
-	}
-	while((pos=s.find_first_of('/',pre))!=std::string::npos){
-		dir=s.substr(0,pos++);
-		pre=pos;
-		if(dir.size()==0) continue; // if leading / first time is 0 length
-		if((mdret=mkdir(dir.c_str(),mode)) && errno!=EEXIST){
-			return mdret;
-		}
-	}
+    size_t pre=0,pos;
+    std::string dir;
+    int mdret = 0;
+    if (s[s.size()-1]!='/')
+    {
+        s+='/';
+    }
+    while((pos=s.find_first_of('/',pre))!=std::string::npos)
+    {
+        dir=s.substr(0,pos++);
+        pre=pos;
+        if (dir.size()==0) continue; // if leading / first time is 0 length
+        if ((mdret=mkdir(dir.c_str(),mode)) && errno!=EEXIST)
+        {
+            return mdret;
+        }
+    }
 	return mdret;
 }
 
 char parse_hex(char c)
 {
-	if ('0' <= c && c <= '9') return c - '0';
-	if ('A' <= c && c <= 'F') return c - 'A' + 10;
-	if ('a' <= c && c <= 'f') return c - 'a' + 10;
-	std::abort();
+    if ('0' <= c && c <= '9') return c - '0';
+    if ('A' <= c && c <= 'F') return c - 'A' + 10;
+    if ('a' <= c && c <= 'f') return c - 'a' + 10;
+    std::abort();
 }
 
 char* parse_string(const std::string & s)
 {
-	char* buffer = new char[s.size() / 2];
-	for (std::size_t i = 0; i != s.size() / 2; ++i)
-		buffer[i] = 16 * parse_hex(s[2 * i]) + parse_hex(s[2 * i + 1]);
-	return buffer;
+    char* buffer = new char[s.size() / 2];
+    for (std::size_t i = 0; i != s.size() / 2; ++i)
+        buffer[i] = 16 * parse_hex(s[2 * i]) + parse_hex(s[2 * i + 1]);
+    return buffer;
 }
 
 std::string GetTicket(std::string titleId, std::string encTitleKey, char* titleVersion)
 {
-	std::ostringstream ofs;
-	ofs.write(tikTemp, 0xA50);
-	ofs.seekp(top+0xA6, std::ios::beg);
-	ofs.write(titleVersion, 0x2);
-	ofs.seekp(top+0x9C, std::ios::beg);
-	ofs.write(parse_string(titleId), 0x8);
-	ofs.seekp(top+0x7F, std::ios::beg);
-	ofs.write(parse_string(encTitleKey), 0x10);
-	return ofs.str();
+    std::ostringstream ofs;
+    ofs.write(tikTemp, 0xA50);
+    ofs.seekp(top+0xA6, std::ios::beg);
+    ofs.write(titleVersion, 0x2);
+    ofs.seekp(top+0x9C, std::ios::beg);
+    ofs.write(parse_string(titleId), 0x8);
+    ofs.seekp(top+0x7F, std::ios::beg);
+    ofs.write(parse_string(encTitleKey), 0x10);
+    return ofs.str();
 }
-
-
 
 void removeForbiddenChar(std::string* s)
 {
-	std::string::iterator it;
-	std::string illegalChars = "\\/:?\"<>|";
-	for (it = s->begin() ; it < s->end() ; ++it){
-		bool found = illegalChars.find(*it) != std::string::npos;
-		if(found)
-		{
-			*it = ' ';
-		}
-	}
+    std::string::iterator it;
+    std::string illegalChars = "\\/:?\"<>|";
+    for (it = s->begin() ; it < s->end() ; ++it)
+    {
+        bool found = illegalChars.find(*it) != std::string::npos;
+        if (found)
+        {
+            *it = ' ';
+        }
+    }
 }
 
 std::string ToHex(const std::string& s)
 {
-	std::ostringstream ret;
-	for (std::string::size_type i = 0; i < s.length(); ++i)
-	{
-		int z = s[i]&0xff;
-		ret << std::hex << std::setfill('0') << std::setw(2) << z;
-	}
-	return ret.str();
+    std::ostringstream ret;
+    for (std::string::size_type i = 0; i < s.length(); ++i)
+    {
+        int z = s[i]&0xff;
+        ret << std::hex << std::setfill('0') << std::setw(2) << z;
+    }
+    return ret.str();
 }
 
 
 void load_JSON_data()
 {
-	printf("loading horns.json...\n");
-	std::ifstream ifs("/TIKdevil/horns.json");
-	Json::Reader reader;
-	Json::Value obj;
-	reader.parse(ifs, obj);
-	sourceData = obj; // array of characters
+    printf("loading horns.json...\n");
+    std::ifstream ifs("/TIKdevil/horns.json");
+    Json::Reader reader;
+    Json::Value obj;
+    reader.parse(ifs, obj);
+    sourceData = obj; // array of characters
 
-	if(sourceData[0]["titleID"].isString()) {
-	  sourceDataType = JSON_TYPE_ONLINE;
-	} else if (sourceData[0]["titleid"].isString()) {
-	  sourceDataType = JSON_TYPE_HORNS;
-	}
+    if (sourceData[0]["titleID"].isString())
+    {
+        sourceDataType = JSON_TYPE_ONLINE;
+    } else if (sourceData[0]["titleid"].isString())
+    {
+        sourceDataType = JSON_TYPE_HORNS;
+    }
 }
 
 
 std::string get_file_contents(const char *filename)
 {
-  std::ifstream in(filename, std::ios::in | std::ios::binary);
-  if (in)
-  {
-	return(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
-  }
-  throw(errno);
+    std::ifstream in(filename, std::ios::in | std::ios::binary);
+    if (in)
+    {
+        return(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
+    }
+    throw(errno);
 }
 
-int util_compare_u64(const void* e1, const void* e2) {
-	u64 id1 = *(u64*) e1;
-	u64 id2 = *(u64*) e2;
+int util_compare_u64(const void* e1, const void* e2)
+{
+    u64 id1 = *(u64*) e1;
+    u64 id2 = *(u64*) e2;
 
-	return id1 > id2 ? 1 : id1 < id2 ? -1 : 0;
+    return id1 > id2 ? 1 : id1 < id2 ? -1 : 0;
 }
 
 std::vector<std::string> util_get_installed_tickets()
 {
-	std::vector<std::string> vTickets;
-	Result res = 0;
-	u32 ticketCount = 0;
-	if(R_SUCCEEDED(res = AM_GetTicketCount(&ticketCount))) {
-		u64* ticketIDs = (u64*) calloc(ticketCount, sizeof(u64));
-		if(ticketIDs != NULL) {
-			if(R_SUCCEEDED(res = AM_GetTicketList(&ticketCount, ticketCount, 0, ticketIDs))) {
-				qsort(ticketIDs, ticketCount, sizeof(u64), util_compare_u64);
-				char cur[34];
-				for(u32 i = 0; i < ticketCount && R_SUCCEEDED(res); i++) {
-					sprintf(cur,"%016llX", ticketIDs[i]);
-					vTickets.push_back(cur);
-				}
-			}
-		}
-	}
-	return vTickets;
+    std::vector<std::string> vTickets;
+    Result res = 0;
+    u32 ticketCount = 0;
+    if (R_SUCCEEDED(res = AM_GetTicketCount(&ticketCount)))
+    {
+        u64* ticketIDs = (u64*) calloc(ticketCount, sizeof(u64));
+        if (ticketIDs != NULL)
+        {
+            if (R_SUCCEEDED(res = AM_GetTicketList(&ticketCount, ticketCount, 0, ticketIDs)))
+            {
+                qsort(ticketIDs, ticketCount, sizeof(u64), util_compare_u64);
+                char cur[34];
+                for(u32 i = 0; i < ticketCount && R_SUCCEEDED(res); i++)
+                {
+                    sprintf(cur,"%016llX", ticketIDs[i]);
+                    vTickets.push_back(cur);
+                }
+            }
+        }
+    }
+    return vTickets;
 }
 
 bool is_ticket_installed(std::vector<std::string> &vNANDTiks, std::string &titleId)
 {
-	for(unsigned int foo =0; foo < vNANDTiks.size(); foo++)
-	{
-		std::string curTik = vNANDTiks.at(foo);
-		std::transform(curTik.begin(), curTik.end(), curTik.begin(), ::tolower);
-		if(titleId == curTik)
-		{
-			return true;
-		}
-	}
-	return false;
+    for(unsigned int foo =0; foo < vNANDTiks.size(); foo++)
+    {
+        std::string curTik = vNANDTiks.at(foo);
+        std::transform(curTik.begin(), curTik.end(), curTik.begin(), ::tolower);
+        if (titleId == curTik)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<std::string> &vTitleID, std::vector<std::string> &vTitleRegion, int &n, std::string regionFilter, bool del)
@@ -219,7 +229,8 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 	} else
 		return;
 
-	if(del == false){
+	if (del == false)
+    {
 		printf("Checking for already installed tiks...\n\n");
 	} else {
 		printf("Checking for out of region tiks...\n\n");
@@ -240,7 +251,8 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 	bool isNotSystemTitle;
 	int dellastPrint = 0;
 	int index = sourceData.size() - 1;
-	for (unsigned int i = 0; i < sourceData.size(); i++) {
+	for (unsigned int i = 0; i < sourceData.size(); i++)
+    {
 		// Check that the encTitleKey isn't null
 		if (sourceData[i]["encTitleKey"].isNull())
 		{
@@ -255,81 +267,97 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 		titleType = sourceData[i]["titleID"].asString().substr(4,4);
 
 		isNotSystemTitle = (titleType == ESHOP_GAMEAPP or titleType == ESHOP_DLC or titleType == ESHOP_DSIWARE);
+        if (
+                ctitleId == NULL ||
+                cencTitleKey == NULL ||
+                ctitleName == NULL ||
+                isNotSystemTitle == false
+        )
+        {
+            // We don't want this ticket, skip it.
+            continue;
+        }
 
-		if(del == false)
+		if (del == false)
 		{
-
-			if(regionFilter != "ALL")
+			if (
+                (
+                    titleRegion == regionFilter ||
+                    titleRegion == "ALL" ||
+                    titleRegion == ""
+                ) ||
+                regionFilter == "ALL"
+            )
 			{
-				// a specific region is selected
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true and (titleRegion == regionFilter || titleRegion == "ALL" || titleRegion == ""))
+				// add it if it isn't a system title and the region matches
+				if (is_ticket_installed(vNANDTiks, titleId)==false)
 				{
-					// add it if it isn't a system title and the region matches
+                    n++;
 
+                    encTitleKey = cencTitleKey;
+                    encTitleKey.erase(remove_if (encTitleKey.begin(), encTitleKey.end(), isspace), encTitleKey.end());
 
-					if(is_ticket_installed(vNANDTiks, titleId)==false)
-					{
-						n++;
-
-						encTitleKey = cencTitleKey;
-						encTitleKey.erase(remove_if(encTitleKey.begin(), encTitleKey.end(), isspace), encTitleKey.end());
-
-						vTitleID.push_back(titleId);
-						vEncTitleKey.push_back(encTitleKey);
-						vTitleRegion.push_back(titleRegion);
-					}
-				}
-			} else {
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true)
-				{
-					// add anything that isn't a system title ticket
-					if(is_ticket_installed(vNANDTiks, titleId)==false)
-					{
-						encTitleKey = cencTitleKey;
-						encTitleKey.erase(remove_if(encTitleKey.begin(), encTitleKey.end(), isspace), encTitleKey.end());
-						n++;
-						vTitleID.push_back(titleId);
-						vEncTitleKey.push_back(encTitleKey);
-					}
+                    vTitleID.push_back(titleId);
+                    vEncTitleKey.push_back(encTitleKey);
+                    vTitleRegion.push_back(titleRegion);
 				}
 			}
 		} else {
 
 			u64 curr;
-			if(regionFilter != "ALL")
+
+			if (
+                (
+                    (
+                        regionFilter != "REGION FREE" &&
+                        titleRegion != regionFilter &&
+                        titleRegion != "ALL" &&
+                        titleRegion != ""
+                    ) ||
+                    (
+                        regionFilter == "REGION FREE" &&
+                        (
+                            titleRegion != "ALL" &&
+                            titleRegion != ""
+                        )
+                    )
+                ) ||
+                regionFilter == "ALL"
+            )
 			{
-				// If region is not ALL
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true and ((regionFilter != "REGION FREE" && titleRegion != regionFilter && titleRegion != "ALL" && titleRegion != "") || (regionFilter == "REGION FREE" && (titleRegion != "ALL" && titleRegion != ""))))
-				{
-					// If region matches selection and it not a system title
-					if(is_ticket_installed(vNANDTiks, titleId)==true){
-						n++;
-						curr = strtoull(ctitleId, NULL, 16) ;
-						AM_DeleteTicket(curr);
-					}
-				}
-			} else {
-				if(ctitleId != NULL and cencTitleKey != NULL and ctitleName != NULL and isNotSystemTitle == true)
-				{
-					// This isn't a system title ticket, remove it
-					if(is_ticket_installed(vNANDTiks, titleId)==true){
-						n++;
-						curr = strtoull(ctitleId, NULL, 16) ;
-						AM_DeleteTicket(curr);
-					}
+				// If region matches selection and it not a system title
+				if (is_ticket_installed(vNANDTiks, titleId)==true)
+                {
+					n++;
+					curr = strtoull(ctitleId, NULL, 16) ;
+					AM_DeleteTicket(curr);
 				}
 			}
+
 			int delprogress = i*100/index;
-			if((delprogress%10==0 and delprogress>dellastPrint)or(delprogress==0 and dellastPrint==0)){
+			if (
+                (
+                    delprogress % 10 == 0 &&
+                    delprogress > dellastPrint
+                ) ||
+                (
+                    delprogress == 0 &&
+                    dellastPrint == 0
+                )
+            )
+            {
 				printf("%d%% ", delprogress);
 				dellastPrint = delprogress+1;
 			}
 		}
 	}
 
-	if(del==false){
+	if (del==false)
+    {
 		printf("Missing tickets: %d\n\n", n);
-	} else if(del==true){
+	}
+    else if (del==true)
+    {
 		printf("100%%\n\n");
 		printf("Deleted tickets: %d\n\n", n);
 	}
@@ -351,7 +379,17 @@ void action_install(std::vector<std::string> vEncTitleKey,std::vector<std::strin
 		AM_InstallTicketFinish(hTik);
 
 		int instprogress = i*100/index;
-		if((instprogress%10==0 and instprogress>instlastPrint)or(instprogress==0 and instlastPrint==0)){
+		if (
+            (
+                instprogress % 10 == 0 &&
+                instprogress > instlastPrint
+            ) ||
+            (
+                instprogress == 0 &&
+                instlastPrint == 0
+            )
+        )
+        {
 			printf("%d%% ", instprogress);
 			instlastPrint = instprogress+1;
 		}
@@ -375,57 +413,79 @@ void action_about()
 
 void action_toggle_region()
 {
-	if(region == "REGION FREE")region = "ALL";
-	else if(region == "ALL") region = "EUR";
-	else if(region == "EUR") region = "USA";
-	else if(region == "USA") region = "JPN";
-	else if(region == "JPN") region = "CHN";
-	else if(region == "CHN") region = "KOR";
-	else if(region == "KOR") region = "TWN";
-	else if(region == "TWN") region = "REGION FREE";
+	if (region == "REGION FREE")region = "ALL";
+	else if (region == "ALL") region = "EUR";
+	else if (region == "EUR") region = "USA";
+	else if (region == "USA") region = "JPN";
+	else if (region == "JPN") region = "CHN";
+	else if (region == "CHN") region = "KOR";
+	else if (region == "KOR") region = "TWN";
+	else if (region == "TWN") region = "REGION FREE";
 }
 
-int action_getconfirm(bool removing){
+int action_getconfirm(bool removing)
+{
 	int ret = 0;
 
 	char msg[72];
 
-	if(region == "ALL"){
-		sprintf(msg, "Region set to ALL are you sure?");
-			const char *confirm[] = {
-			"No, take me to main menu.",
-			"No, I only want EUR.",
-			"No, I only want USA.",
-			"No, I only want JPN.",
-			"No, I only want CHN.",
-			"No, I only want KOR.",
-			"No, I only want TWN.",
-			"No, I only want region free.",
-			"ARR ARR SELECT THEM ALL."
-		};
+	if (region == "ALL")
+    {
+        sprintf(msg, "Region set to ALL are you sure?");
+        const char *confirm[] = {
+            "No, take me to main menu.",
+            "No, I only want EUR.",
+            "No, I only want USA.",
+            "No, I only want JPN.",
+            "No, I only want CHN.",
+            "No, I only want KOR.",
+            "No, I only want TWN.",
+            "No, I only want region free.",
+            "ARR ARR SELECT THEM ALL."
+        };
 		while(ret==0)
 		{
+            ret = 1;
 			int result = menu_draw(msg, " ", 0, sizeof(confirm) / sizeof(char*), confirm);
 			switch (result)
 			{
 				case 0:
-					ret=-1; break;
+					ret = -1;
+                    break;
+
 				case 1:
-					ret=1; region = "EUR"; break;
+                    region = "EUR";
+                    break;
+
 				case 2:
-					ret=1; region = "USA"; break;
+                    region = "USA";
+                    break;
+
 				case 3:
-					ret=1; region = "JPN"; break;
+                    region = "JPN";
+                    break;
+
 				case 4:
-					ret=1; region = "CHN"; break;
+                    region = "CHN";
+                    break;
+
 				case 5:
-					ret=1; region = "KOR"; break;
+                    region = "KOR";
+                    break;
+
 				case 6:
-					ret=1; region = "TWN"; break;
+                    region = "TWN";
+                    break;
+
 				case 7:
-					ret=1; region = "REGION FREE"; break;
-				case 8:
-					ret=1; break;
+                    region = "REGION FREE";
+                    break;
+
+				case 8: break;
+
+                default:
+                    ret = 0;
+                    break;
 			}
 			clear_screen(GFX_BOTTOM);
 		}
@@ -433,7 +493,8 @@ int action_getconfirm(bool removing){
 	} else {
 		printf("Region set to %s, press A to continue,\nor any other to cancel.", region.c_str());
 		u32 keys = wait_key();
-		if (keys == KEY_A) {
+		if (keys == KEY_A)
+        {
 			ret = 1;
 		} else {
 			ret = -1;
@@ -441,37 +502,49 @@ int action_getconfirm(bool removing){
 		consoleClear();
 	}
 
-	if(removing == true && region == "ALL"){
-		printf(CONSOLE_RED "\nDanger, Will Robinson!\nThis will remove ALL tickets\nincluding ones for your region!" CONSOLE_RESET "\n\nPress A to continue,\nor any other to cancel.\n\n");
-	  u32 keys = wait_key();
+	if (removing == true && region == "ALL")
+    {
+        printf(CONSOLE_RED);
+        printf("\nDanger, Will Robinson!");
+        printf("\nThis will remove ALL tickets");
+        printf("\nincluding ones for your region!" CONSOLE_RESET "\n");
+        printf("\nPress A to continue,\nor any other to cancel.\n\n");
 
-	  if (keys == KEY_A) {
-		ret = 1;
-	  } else {
-				ret = -1;
-			}
+        u32 keys = wait_key();
+
+        if (keys == KEY_A)
+        {
+            ret = 1;
+        } else {
+            ret = -1;
+        }
 	}
-	if(removing == true && region == "REGION FREE"){
-		printf(CONSOLE_RED "\nDanger, Will Robinson!\nThis will remove everything except region free\ntickets, this may include ones you have installed!" CONSOLE_RESET "\n\nPress A to continue,\nor any other to cancel.\n\n");
-	  u32 keys = wait_key();
+	if (removing == true && region == "REGION FREE")
+    {
+		printf(CONSOLE_RED);
+        printf("\nDanger, Will Robinson!");
+        printf("\nThis will remove everything except region free");
+        printf("\ntickets, this may include ones you have installed!" CONSOLE_RESET "\n");
+        printf("\nPress A to continue,\nor any other to cancel.\n\n");
 
-	  if (keys & KEY_A) {
-		ret = 1;
-	  } else {
-				ret = -1;
-			}
+        u32 keys = wait_key();
+
+        if (keys & KEY_A)
+        {
+            ret = 1;
+        } else {
+            ret = -1;
+        }
 	}
 
 	return ret;
 }
 
-
-
 void select_oneclick()
 {
 	consoleClear();
 	int w = action_getconfirm(false);
-	if(w<0)return;
+	if (w<0)return;
 	std::vector<std::string> Keys;
 	std::vector<std::string> IDs;
 	std::vector<std::string> Regions;
@@ -480,27 +553,31 @@ void select_oneclick()
 	action_install(Keys, IDs, n);
 	printf("\nPress A to open eShop.");
 	printf("\nPress B to return to the main menu.");
-	while(true){
+	while(true)
+    {
 		u32 keys = wait_key();
-		switch(keys){
+		switch(keys)
+        {
 			case KEY_A: launch_eshop(); break;
-			case KEY_B: return; break;
+			case KEY_B: return;
 		}
 	}
 }
 
-
-
-void select_removeout(){
+void select_removeout()
+{
 	consoleClear();
 	int w = action_getconfirm(true);
-	if(w<0)return;
+	if (w<0)return;
+
 	printf("Deleting selected tickets...\n");
+
 	std::vector<std::string> Keys;
 	std::vector<std::string> IDs;
 	std::vector<std::string> Regions;
 	int n;
-	action_missing_tickets(Keys, IDs, Regions, n, region, true);
+
+    action_missing_tickets(Keys, IDs, Regions, n, region, true);
 	printf("Done!");
 	wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
@@ -513,15 +590,24 @@ bool menu_main_keypress(int selected, u32 key, void*)
 		switch (selected)
 		{
 			case 0:
-				select_oneclick(); break;
+				select_oneclick();
+                break;
+
 			case 1:
-				select_removeout(); break;
+				select_removeout();
+                break;
+
 			case 2:
-				launch_eshop(); break;
+				launch_eshop();
+                break;
+
 			case 3:
-				action_about(); break;
+				action_about();
+                break;
+
 			case 4:
-				bExit = true; break;
+				bExit = true;
+                break;
 		}
 		return true;
 	}
@@ -536,6 +622,7 @@ bool menu_main_keypress(int selected, u32 key, void*)
 
 void menu_main()
 {
+    char footer[37];
 	const char *options[] = {
 		"Update your Tickets!",
 		"Remove out-of-region tickets",
@@ -543,7 +630,6 @@ void menu_main()
 		"About TIKdevil",
 		"Exit",
 	};
-	char footer[37];
 
 	while (!bExit)
 	{
@@ -576,7 +662,7 @@ int main(int argc, const char* argv[])
 	region = GetSystemRegion();
 
 	menu_main();
-	
+
 	cfguExit();
 	amExit();
 	gfxExit();
