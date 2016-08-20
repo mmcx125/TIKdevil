@@ -52,4 +52,4 @@ ICON := icon.png
 
 # INTERNAL #
 
-include bt/make_base
+include buildtools/make_base
