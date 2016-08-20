@@ -28,47 +28,47 @@ along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
 
 //MISC
 void char_to_int_array(unsigned char destination[], char source[], int size, int endianness, int base)
-{	
+{
 	char tmp[size][2];
-    unsigned char *byte_array = (unsigned char *)malloc(size*sizeof(unsigned char));
+	unsigned char *byte_array = (unsigned char *)malloc(size*sizeof(unsigned char));
 	memset(byte_array, 0, size);
 	memset(destination, 0, size);
 	memset(tmp, 0, size*2);
-    
-    for (int i = 0; i < size; i ++){
+
+	for (int i = 0; i < size; i ++){
 		tmp[i][0] = source[(i*2)];
-        tmp[i][1] = source[((i*2)+1)];
+		tmp[i][1] = source[((i*2)+1)];
 		tmp[i][2] = '\0';
-        byte_array[i] = (unsigned char)strtol(tmp[i], NULL, base);
-    }
+		byte_array[i] = (unsigned char)strtol(tmp[i], NULL, base);
+	}
 	endian_memcpy(destination,byte_array,size,endianness);
 	/**
 	for (int i = 0; i < size; i++){
-        switch (endianness){
-        	case(BIG_ENDIAN):
-        	destination[i] = byte_array[i];
-        	break;
-        	case(LITTLE_ENDIAN):
-        	destination[i] = byte_array[((size-1)-i)];
-        	break;
-        }
-    }
+		switch (endianness){
+			case(BIG_ENDIAN):
+			destination[i] = byte_array[i];
+			break;
+			case(LITTLE_ENDIAN):
+			destination[i] = byte_array[((size-1)-i)];
+			break;
+		}
+	}
 	**/
 	free(byte_array);
 }
 
 void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness)
-{ 
-    for (u32 i = 0; i < size; i++){
-        switch (endianness){
-            case(BIG_ENDIAN):
-                destination[i] = source[i];
-                break;
-            case(LITTLE_ENDIAN):
-                destination[i] = source[((size-1)-i)];
-                break;
-        }
-    }
+{
+	for (u32 i = 0; i < size; i++){
+		switch (endianness){
+			case(BIG_ENDIAN):
+				destination[i] = source[i];
+				break;
+			case(LITTLE_ENDIAN):
+				destination[i] = source[((size-1)-i)];
+				break;
+		}
+	}
 }
 
 void u8_hex_print_be(u8 *array, int len)
@@ -122,7 +122,7 @@ void PrintProgress(u32 nSize, u32 nCurrent)
 {
 	// Don't attempt to calculate anything if we don't have a final size
 	if (nSize == 0) return;
-	
+
 	// Calculate percent and bar width
 	double fPercent = ((double)nCurrent / nSize) * 100.0;
 	u16 barDrawWidth = (fPercent / 100) * 40;
@@ -136,15 +136,15 @@ void PrintProgress(u32 nSize, u32 nCurrent)
 	printf("\r");
 
 	// Make sure the screen updates
-    gfxFlushBuffers();
-    gspWaitForVBlank();
+	gfxFlushBuffers();
+	gspWaitForVBlank();
 }
 
 void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output)
 {
 	fseek_64(output,offset,SEEK_SET);
 	fwrite(buffer,size,1,output);
-} 
+}
 
 void write_align_padding(FILE *output, size_t alignment)
 {
@@ -165,9 +165,9 @@ u64 GetFileSize_u64(char *filename)
 	u64 size;
 #ifdef _WIN32
 	int fh;
- 	u64 n;
-  	fh = _open( filename, 0 );
-  	n = _lseeki64(fh, 0, SEEK_END);
+	 u64 n;
+	  fh = _open( filename, 0 );
+	  n = _lseeki64(fh, 0, SEEK_END);
 	_close(fh);
 	size = (n / sizeof(short))*2;
 #else
@@ -183,28 +183,28 @@ int TruncateFile_u64(char *filename, u64 filelen)
 {
 #ifdef _WIN32
 	HANDLE fh;
- 
+
 	LARGE_INTEGER fp;
 	fp.QuadPart = filelen;
- 
+
 	fh = CreateFile(filename, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 	if (fh == INVALID_HANDLE_VALUE) {
 		printf("[!] Invalid File handle\n");
 		return 1;
 	}
- 
+
 	if (SetFilePointerEx(fh, fp, NULL, FILE_BEGIN) == 0 ||
-	    SetEndOfFile(fh) == 0) {
+		SetEndOfFile(fh) == 0) {
 		printf("[!] truncate failed\n");
 		CloseHandle(fh);
 		return 1;
 	}
- 
+
 	CloseHandle(fh);
 	return 0;
 #else
 	return truncate(filename,filelen);
-#endif	
+#endif
 }
 
 int fseek_64(FILE *fp, u64 file_pos, int whence)
@@ -255,200 +255,200 @@ void DownloadFile_InternalInstall(void* out, unsigned char* buffer, u32 readSize
 Result DownloadFile_Internal(const char *url, void *out, bool bProgress,
 							 void (*write)(void* out, unsigned char* buffer, u32 readSize))
 {
-    httpcContext context;
-    u32 fileSize = 0;
-    u32 procSize = 0;
-    Result ret = 0;
-    Result dlret = HTTPC_RESULTCODE_DOWNLOADPENDING;
-    u32 status;
-    u32 bufSize = 0x100000;
-    u32 readSize = 0;
-    httpcOpenContext(&context, HTTPC_METHOD_GET, (char*)url, 1);
+	httpcContext context;
+	u32 fileSize = 0;
+	u32 procSize = 0;
+	Result ret = 0;
+	Result dlret = HTTPC_RESULTCODE_DOWNLOADPENDING;
+	u32 status;
+	u32 bufSize = 0x100000;
+	u32 readSize = 0;
+	httpcOpenContext(&context, HTTPC_METHOD_GET, (char*)url, 1);
 
-    ret = httpcBeginRequest(&context);
-    if (ret != 0) goto _out;
+	ret = httpcBeginRequest(&context);
+	if (ret != 0) goto _out;
 
-    ret = httpcGetResponseStatusCode(&context, &status);
-    if (ret != 0) goto _out;
+	ret = httpcGetResponseStatusCode(&context, &status);
+	if (ret != 0) goto _out;
 
-    if (status != 200)
-    {
-        ret = status;
-        goto _out;
-    }
+	if (status != 200)
+	{
+		ret = status;
+		goto _out;
+	}
 
-    ret = httpcGetDownloadSizeState(&context, NULL, &fileSize);
-    if (ret != 0) goto _out;
+	ret = httpcGetDownloadSizeState(&context, NULL, &fileSize);
+	if (ret != 0) goto _out;
 
-    {
-        unsigned char *buffer = (unsigned char *)linearAlloc(bufSize);
-        if (buffer == NULL)
-        {
-            printf("Error allocating download buffer\n");
-            ret = -1;
-            goto _out;
-        }
+	{
+		unsigned char *buffer = (unsigned char *)linearAlloc(bufSize);
+		if (buffer == NULL)
+		{
+			printf("Error allocating download buffer\n");
+			ret = -1;
+			goto _out;
+		}
 
-        while (dlret == (s32)HTTPC_RESULTCODE_DOWNLOADPENDING)
-        {
-            memset(buffer, 0, bufSize);
+		while (dlret == (s32)HTTPC_RESULTCODE_DOWNLOADPENDING)
+		{
+			memset(buffer, 0, bufSize);
 
-            dlret = httpcDownloadData(&context, buffer, bufSize, &readSize);
-            write(out, buffer, readSize);
+			dlret = httpcDownloadData(&context, buffer, bufSize, &readSize);
+			write(out, buffer, readSize);
 
-            procSize += readSize;
-            if (bProgress)
-            {
-            	PrintProgress(fileSize, procSize);
-            }
-        }
-        linearFree(buffer);
-    }
+			procSize += readSize;
+			if (bProgress)
+			{
+				PrintProgress(fileSize, procSize);
+			}
+		}
+		linearFree(buffer);
+	}
 _out:
-    httpcCloseContext(&context);
+	httpcCloseContext(&context);
 
-    return ret;
+	return ret;
 }
 
 Result DownloadFileSecure_Internal(const char *hostname, const char* request, void *out, bool bProgress,
 							 void (*write)(void* out, unsigned char* buffer, u32 readSize))
 {
-    Result ret=0;
+	Result ret=0;
 
-    struct addrinfo hints;
-    struct addrinfo *resaddr = NULL, *resaddr_cur;
-    int sockfd;
-    u8 *readbuf = (u8 *)linearAlloc(0x400);
+	struct addrinfo hints;
+	struct addrinfo *resaddr = NULL, *resaddr_cur;
+	int sockfd;
+	u8 *readbuf = (u8 *)linearAlloc(0x400);
 
-    sslcContext sslc_context;
-    //u32 RootCertChain_contexthandle=0;
+	sslcContext sslc_context;
+	//u32 RootCertChain_contexthandle=0;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd==-1)
-    {
-        printf("Failed to create the socket.\n");
-        return -1;
-    }
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(sockfd==-1)
+	{
+		printf("Failed to create the socket.\n");
+		return -1;
+	}
 
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
 
-    if(getaddrinfo(hostname, "443", &hints, &resaddr)!=0)
-    {
-        printf("getaddrinfo() failed.\n");
-        closesocket(sockfd);
-        return -1;
-    }
+	if(getaddrinfo(hostname, "443", &hints, &resaddr)!=0)
+	{
+		printf("getaddrinfo() failed.\n");
+		closesocket(sockfd);
+		return -1;
+	}
 
-    for(resaddr_cur = resaddr; resaddr_cur!=NULL; resaddr_cur = resaddr_cur->ai_next)
-    {
-        if(connect(sockfd, resaddr_cur->ai_addr, resaddr_cur->ai_addrlen)==0)break;
-    }
+	for(resaddr_cur = resaddr; resaddr_cur!=NULL; resaddr_cur = resaddr_cur->ai_next)
+	{
+		if(connect(sockfd, resaddr_cur->ai_addr, resaddr_cur->ai_addrlen)==0)break;
+	}
 
-    freeaddrinfo(resaddr);
+	freeaddrinfo(resaddr);
 
-    if(resaddr_cur==NULL)
-    {
-        printf("Failed to connect.\n");
-        closesocket(sockfd);
-        return -1;
-    }
+	if(resaddr_cur==NULL)
+	{
+		printf("Failed to connect.\n");
+		closesocket(sockfd);
+		return -1;
+	}
 
-    /*ret = sslcCreateRootCertChain(&RootCertChain_contexthandle);
-    if(R_FAILED(ret))
-    {
-        printf("sslcCreateRootCertChain() failed: 0x%08x.\n", (unsigned int)ret);
-        closesocket(sockfd);
-        return ret;
-    }
-    ret = sslcAddTrustedRootCA(RootCertChain_contexthandle, (u8*)builtin_rootca_bin, builtin_rootca_bin_len, NULL);
-    if(R_FAILED(ret))
-    {
-        printf("sslcAddTrustedRootCA() failed: 0x%08x.\n", (unsigned int)ret);
-        closesocket(sockfd);
-        sslcDestroyRootCertChain(RootCertChain_contexthandle);
-        return ret;
-    }*/
+	/*ret = sslcCreateRootCertChain(&RootCertChain_contexthandle);
+	if(R_FAILED(ret))
+	{
+		printf("sslcCreateRootCertChain() failed: 0x%08x.\n", (unsigned int)ret);
+		closesocket(sockfd);
+		return ret;
+	}
+	ret = sslcAddTrustedRootCA(RootCertChain_contexthandle, (u8*)builtin_rootca_bin, builtin_rootca_bin_len, NULL);
+	if(R_FAILED(ret))
+	{
+		printf("sslcAddTrustedRootCA() failed: 0x%08x.\n", (unsigned int)ret);
+		closesocket(sockfd);
+		sslcDestroyRootCertChain(RootCertChain_contexthandle);
+		return ret;
+	}*/
 
-    // For the life of me can't get the 3DS to accept a Let's Encrypt cert, so for now don't verify
-    ret = sslcCreateContext(&sslc_context, sockfd, SSLCOPT_Default | SSLCOPT_DisableVerify, (char*)hostname);
-    if(R_FAILED(ret))
-    {
-        printf("sslcCreateContext() failed: 0x%08x.\n", (unsigned int)ret);
-        closesocket(sockfd);
-        //sslcDestroyRootCertChain(RootCertChain_contexthandle);
-        return ret;
-    }
+	// For the life of me can't get the 3DS to accept a Let's Encrypt cert, so for now don't verify
+	ret = sslcCreateContext(&sslc_context, sockfd, SSLCOPT_Default | SSLCOPT_DisableVerify, (char*)hostname);
+	if(R_FAILED(ret))
+	{
+		printf("sslcCreateContext() failed: 0x%08x.\n", (unsigned int)ret);
+		closesocket(sockfd);
+		//sslcDestroyRootCertChain(RootCertChain_contexthandle);
+		return ret;
+	}
 
-    /*ret = sslcContextSetRootCertChain(&sslc_context, RootCertChain_contexthandle);
-    if(R_FAILED(ret))
-    {
-        printf("sslcContextSetRootCertChain() failed: 0x%08x.\n", (unsigned int)ret);
-        sslcDestroyContext(&sslc_context);
-        sslcDestroyRootCertChain(RootCertChain_contexthandle);
-        closesocket(sockfd);
-        return ret;
-    }*/
+	/*ret = sslcContextSetRootCertChain(&sslc_context, RootCertChain_contexthandle);
+	if(R_FAILED(ret))
+	{
+		printf("sslcContextSetRootCertChain() failed: 0x%08x.\n", (unsigned int)ret);
+		sslcDestroyContext(&sslc_context);
+		sslcDestroyRootCertChain(RootCertChain_contexthandle);
+		closesocket(sockfd);
+		return ret;
+	}*/
 
-    ret = sslcStartConnection(&sslc_context, NULL, NULL);
-    if(R_FAILED(ret))
-    {
-        printf("sslcStartConnection() failed: 0x%08x.\n", (unsigned int)ret);
-        sslcDestroyContext(&sslc_context);
-        //sslcDestroyRootCertChain(RootCertChain_contexthandle);
-        closesocket(sockfd);
-        return ret;
-    }
+	ret = sslcStartConnection(&sslc_context, NULL, NULL);
+	if(R_FAILED(ret))
+	{
+		printf("sslcStartConnection() failed: 0x%08x.\n", (unsigned int)ret);
+		sslcDestroyContext(&sslc_context);
+		//sslcDestroyRootCertChain(RootCertChain_contexthandle);
+		closesocket(sockfd);
+		return ret;
+	}
 
-    ret = sslcWrite(&sslc_context, (u8*)request, strlen(request));
-    if(R_FAILED(ret))
-    {
-        printf("sslcWrite() failed: 0x%08x.\n", (unsigned int)ret);
-        sslcDestroyContext(&sslc_context);
-        //sslcDestroyRootCertChain(RootCertChain_contexthandle);
-        closesocket(sockfd);
-        return ret;
-    }
+	ret = sslcWrite(&sslc_context, (u8*)request, strlen(request));
+	if(R_FAILED(ret))
+	{
+		printf("sslcWrite() failed: 0x%08x.\n", (unsigned int)ret);
+		sslcDestroyContext(&sslc_context);
+		//sslcDestroyRootCertChain(RootCertChain_contexthandle);
+		closesocket(sockfd);
+		return ret;
+	}
 
-    memset(readbuf, 0, 0x400);
+	memset(readbuf, 0, 0x400);
 
-    bool bHeaderEnded = false;
-    while ((ret = sslcRead(&sslc_context, readbuf, 0x400-1, false)) > 0)
-    {
-        if(R_FAILED(ret))
-        {
-            printf("sslcWrite() failed: 0x%08x.\n", (unsigned int)ret);
-            sslcDestroyContext(&sslc_context);
-            //sslcDestroyRootCertChain(RootCertChain_contexthandle);
-            closesocket(sockfd);
-            return ret;
-        }
+	bool bHeaderEnded = false;
+	while ((ret = sslcRead(&sslc_context, readbuf, 0x400-1, false)) > 0)
+	{
+		if(R_FAILED(ret))
+		{
+			printf("sslcWrite() failed: 0x%08x.\n", (unsigned int)ret);
+			sslcDestroyContext(&sslc_context);
+			//sslcDestroyRootCertChain(RootCertChain_contexthandle);
+			closesocket(sockfd);
+			return ret;
+		}
 
-        if (!bHeaderEnded)
-        {
-        	// Skip over the header, we don't really care about its contents.
-        	// Technically there's a very slim chance this fails to find the header
-        	char* headend = strstr((const char*)readbuf, "\r\n\r\n");
-        	if (headend != NULL)
-        	{
-        		int headlen = (headend - (char*)readbuf) + 4;
-        		write(out, (u8*)(headend + 4), (ret - headlen));
-        		bHeaderEnded = true;
-        	}
-        }
-        else
-        {
-        	write(out, readbuf, ret);
-        }
-    }
-    
-    sslcDestroyContext(&sslc_context);
-    //sslcDestroyRootCertChain(RootCertChain_contexthandle);
-    
-    closesocket(sockfd);
+		if (!bHeaderEnded)
+		{
+			// Skip over the header, we don't really care about its contents.
+			// Technically there's a very slim chance this fails to find the header
+			char* headend = strstr((const char*)readbuf, "\r\n\r\n");
+			if (headend != NULL)
+			{
+				int headlen = (headend - (char*)readbuf) + 4;
+				write(out, (u8*)(headend + 4), (ret - headlen));
+				bHeaderEnded = true;
+			}
+		}
+		else
+		{
+			write(out, readbuf, ret);
+		}
+	}
 
-    return 0;
+	sslcDestroyContext(&sslc_context);
+	//sslcDestroyRootCertChain(RootCertChain_contexthandle);
+
+	closesocket(sockfd);
+
+	return 0;
 }
 
 Result DownloadFile(const char *url, FILE *os, bool bProgress)
@@ -461,7 +461,7 @@ Result DownloadFile(const char *url, FILE *os, bool bProgress)
 		std::string sPath = sUrl.substr(nHostEnd);
 		std::string sHost = sUrl.substr(8, nHostEnd - 8);
 		// I am so sorry for HTTP/1.0, but I can't be bothered to write chunked data handling right now
-	    std::string sRequest = "GET " + sPath + " HTTP/1.0\r\nUser-Agent: TIKdevil\r\nConnection: close\r\nHost: " + sHost + "\r\n\r\n";
+		std::string sRequest = "GET " + sPath + " HTTP/1.0\r\nUser-Agent: TIKdevil\r\nConnection: close\r\nHost: " + sHost + "\r\n\r\n";
 
 		return DownloadFileSecure_Internal(sHost.c_str(), sRequest.c_str(), os, bProgress, DownloadFile_InternalSave);
 	}
@@ -506,7 +506,7 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 {
 	u64 u64_return = 0;
 	switch(endianness){
-		case(BIG_ENDIAN): 
+		case(BIG_ENDIAN):
 			u64_return |= (u64)value[7]<<0;
 			u64_return |= (u64)value[6]<<8;
 			u64_return |= (u64)value[5]<<16;
@@ -517,7 +517,7 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 			u64_return |= (u64)value[0]<<56;
 			break;
 			//return (value[7]<<0) | (value[6]<<8) | (value[5]<<16) | (value[4]<<24) | (value[3]<<32) | (value[2]<<40) | (value[1]<<48) | (value[0]<<56);
-		case(LITTLE_ENDIAN): 
+		case(LITTLE_ENDIAN):
 			u64_return |= (u64)value[0]<<0;
 			u64_return |= (u64)value[1]<<8;
 			u64_return |= (u64)value[2]<<16;
@@ -625,31 +625,31 @@ void memdump(FILE* fout, const char* prefix, const u8* data, u32 size)
 // HID related
 u32 wait_key()
 {
-    while (true)
-    {
-        hidScanInput();
+	while (true)
+	{
+		hidScanInput();
 
-        u32 keys = hidKeysDown();
-        if (keys > 0)
-        {
-            return keys;
-        }
-        gfxFlushBuffers();
-        gspWaitForVBlank();
-    }
+		u32 keys = hidKeysDown();
+		if (keys > 0)
+		{
+			return keys;
+		}
+		gfxFlushBuffers();
+		gspWaitForVBlank();
+	}
 }
 
 u32 wait_key_specific(const char* message, u32 key)
 {
 	printf(message);
-    while (true)
-    {
-        u32 keys = wait_key();
-        if (keys & key)
-        {
-        	return keys;
-        }
-    }
+	while (true)
+	{
+		u32 keys = wait_key();
+		if (keys & key)
+		{
+			return keys;
+		}
+	}
 }
 
 // Graphics Functions
@@ -671,69 +671,69 @@ void clear_screen(gfxScreen_t screen)
 
 	switch (format)
 	{
-    case GSP_RGBA8_OES:
-        bpp = 4;
-    case GSP_BGR8_OES:
-        bpp = 3;
-    case GSP_RGB565_OES:
-    case GSP_RGB5_A1_OES:
-    case GSP_RGBA4_OES:
-        bpp = 2;
-    default:
-    	bpp = 3;
+	case GSP_RGBA8_OES:
+		bpp = 4;
+	case GSP_BGR8_OES:
+		bpp = 3;
+	case GSP_RGB565_OES:
+	case GSP_RGB5_A1_OES:
+	case GSP_RGBA4_OES:
+		bpp = 2;
+	default:
+		bpp = 3;
 	}
 
 	memset(buffer1, 0, (width * height * bpp));
 	if (buffer2)
 		memset(buffer2, 0, (width * height * bpp));
 
-    gfxFlushBuffers();
-    gfxSwapBuffers();
-    gspWaitForVBlank();
+	gfxFlushBuffers();
+	gfxSwapBuffers();
+	gspWaitForVBlank();
 }
 
 bool download_JSON() {
   printf("\nAttempting to download JSON...\n");
-  
+
   remove("/TIKdevil/horns.json.tmp");
   FILE *oh = fopen("/TIKdevil/horns.json.tmp", "wb");
-  
+
   if (oh) {
-    Result res = DownloadFile(JSON_URL, oh, false);
-    int size = ftell(oh);
-    fclose(oh);
-    if (res == 0 && size >= 0) {
-      remove("/TIKdevil/horns.json");
-      rename("/TIKdevil/horns.json.tmp", "/TIKdevil/horns.json");
-      return true;
-    }
+	Result res = DownloadFile(JSON_URL, oh, false);
+	int size = ftell(oh);
+	fclose(oh);
+	if (res == 0 && size >= 0) {
+	  remove("/TIKdevil/horns.json");
+	  rename("/TIKdevil/horns.json.tmp", "/TIKdevil/horns.json");
+	  return true;
+	}
   }
-  
+
   printf("Failed to download JSON");
   return false;
 }
 
 bool check_JSON(bool forceUpdate = true) {
-    struct stat filestats;
-    int ret = stat("/TIKdevil/horns.json", &filestats);
+	struct stat filestats;
+	int ret = stat("/TIKdevil/horns.json", &filestats);
 
-    if (ret == 0) {
-      if (forceUpdate == true) {
-        return download_JSON();
-      }
-    } else {
-      printf("No horns.json\n");
+	if (ret == 0) {
+	  if (forceUpdate == true) {
+		return download_JSON();
+	  }
+	} else {
+	  printf("No horns.json\n");
 
-      printf("\nPress A to Download, or any other key to exit.\n");
-      u32 keys = wait_key();
-      
-      if (keys & KEY_A) {
-        return download_JSON();
-      }
-      return false;
-    }
+	  printf("\nPress A to Download, or any other key to exit.\n");
+	  u32 keys = wait_key();
 
-    return true;
+	  if (keys & KEY_A) {
+		return download_JSON();
+	  }
+	  return false;
+	}
+
+	return true;
 }
 
 std::string GetSystemRegion()
@@ -743,59 +743,59 @@ std::string GetSystemRegion()
 
 	if(region == CFG_REGION_JPN)
 		return "JPN";
-	
+
 	if(region == CFG_REGION_USA)
 		return "USA";
-	
+
 	if(region == CFG_REGION_EUR)
 		return "EUR";
-	
+
 	if(region == CFG_REGION_AUS)
 		return "EUR";
-	
+
 	if(region == CFG_REGION_CHN)
 		return "CHN";
-	
+
 	if(region == CFG_REGION_KOR)
 		return "KOR";
-	
+
 	if(region == CFG_REGION_TWN)
 		return "TWN";
-	
+
 	return "REGION FREE ONLY";
 }
 std::string GetSerialType(std::string sSerial)
 {
-    std::string sType = "Unknown";
-    if (sSerial.substr(0, 3) == "TWL")
-    {
-        sType = "DSiWare";
-    }
-    else
-    {
-        switch (sSerial.c_str()[4])
-        {
-            case 'N':
-            case 'P':
-                sType = "Game";
-                break;
-            case 'T':
-                sType = "Demo";
-                break;
-            case 'U':
-                sType = "Update";
-                break;
-            case 'M':
-                sType = "DLC";
-                break;
-        }
-    }
+	std::string sType = "Unknown";
+	if (sSerial.substr(0, 3) == "TWL")
+	{
+		sType = "DSiWare";
+	}
+	else
+	{
+		switch (sSerial.c_str()[4])
+		{
+			case 'N':
+			case 'P':
+				sType = "Game";
+				break;
+			case 'T':
+				sType = "Demo";
+				break;
+			case 'U':
+				sType = "Update";
+				break;
+			case 'M':
+				sType = "DLC";
+				break;
+		}
+	}
 
-    return sType;
+	return sType;
 }
 
 std::string upperCase(std::string input) {
   for (std::string::iterator it = input.begin(); it != input.end(); ++ it)
-    *it = toupper(*it);
+	*it = toupper(*it);
   return input;
 }
