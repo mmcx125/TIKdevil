@@ -28,7 +28,7 @@
 #include <3ds.h>
 
 #include "utils.h"
-#include "eshop.h"
+#include "eshop/eshop.h"
 #include "data.h"
 #include "menu.h"
 #include "json/json.h"
