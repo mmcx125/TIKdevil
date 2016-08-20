@@ -398,17 +398,22 @@ void action_install(std::vector<std::string> vEncTitleKey,std::vector<std::strin
 }
 
 
-void action_about()
+void action_about(gfxScreen_t screen)
 {
+    PrintConsole infoConsole;
+    PrintConsole* currentConsole = consoleSelect(&infoConsole);
+    consoleInit(screen, &infoConsole);
+
 	consoleClear();
 
-	printf(CONSOLE_RED "\n\n\n  TIKdevil by Kyraminol\n\n" CONSOLE_RESET);
+	printf(CONSOLE_RED "\n\n\n  TIKdevil " VERSION_STRING " by Kyraminol\n\n" CONSOLE_RESET);
 	printf("	Generate only missing tickets\n");
 	printf("	and directly install them!\n\n\n");
 	printf(CONSOLE_BLUE "  Special thanks to:\n\n" CONSOLE_RESET);
 	printf("	cearp, Drakia, steveice10, Mmcx125,\n	and DanTheMan827.\n" CONSOLE_RESET);
-	printf("\n\n  Commit: " REVISION_STRING "\n");
-	wait_key_specific("\n\n  Press A to continue.\n", KEY_A);
+	printf("\n\n  Commit: " REVISION_STRING);
+
+    consoleSelect(currentConsole);
 }
 
 void action_toggle_region()
@@ -487,7 +492,6 @@ int action_getconfirm(bool removing)
                     ret = 0;
                     break;
 			}
-			clear_screen(GFX_BOTTOM);
 		}
 		consoleClear();
 	} else {
@@ -602,10 +606,6 @@ bool menu_main_keypress(int selected, u32 key, void*)
                 break;
 
 			case 3:
-				action_about();
-                break;
-
-			case 4:
 				bExit = true;
                 break;
 		}
@@ -627,7 +627,6 @@ void menu_main()
 		"Update your Tickets!",
 		"Remove out-of-region tickets",
 		"Launch eShop",
-		"About TIKdevil",
 		"Exit",
 	};
 
@@ -635,7 +634,6 @@ void menu_main()
 	{
 		sprintf(footer, "Region: [%s] (Press L to change)", region.c_str());
 		menu_multkey_draw("TIKdevil by Kyraminol", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
-		clear_screen(GFX_BOTTOM);
 	}
 }
 
@@ -661,6 +659,7 @@ int main(int argc, const char* argv[])
 	// Load the region from system secure info
 	region = GetSystemRegion();
 
+    action_about(GFX_BOTTOM);
 	menu_main();
 
 	cfguExit();
