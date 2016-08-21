@@ -32,12 +32,14 @@
 #include "data.h"
 #include "menu.h"
 #include "json/json.h"
+#include "ConsoleProgressPrinter/ConsoleProgressPrinter.h"
 
 static const u16 top = 0x140;
 static std::string region = "ALL";
 static bool bExit = false;
 int sourceDataType;
 Json::Value sourceData;
+ConsoleProgressPrinter progressBar(0);
 
 std::string upper(std::string s)
 {
@@ -206,6 +208,14 @@ std::vector<std::string> util_get_installed_tickets()
     return vTickets;
 }
 
+bool is_game_installed(u64* titleID){
+    AM_TitleEntry entry;
+    return (
+        R_SUCCEEDED(AM_GetTitleInfo(MEDIATYPE_SD, 1, titleID, &entry)) ||
+        R_SUCCEEDED(AM_GetTitleInfo(MEDIATYPE_NAND, 1, titleID, &entry))
+    );
+}
+
 bool is_ticket_installed(std::vector<std::string> &vNANDTiks, std::string &titleId)
 {
     for(unsigned int foo =0; foo < vNANDTiks.size(); foo++)
@@ -233,7 +243,7 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
     {
 		printf("Checking for already installed tiks...\n\n");
 	} else {
-		printf("Checking for out of region tiks...\n\n");
+		printf("Checking for out of region tiks not in use...\n\n");
 	}
 
 	n = 0;
@@ -249,10 +259,15 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 	std::string encTitleKey;
 	std::string titleRegion;
 	bool isNotSystemTitle;
-	int dellastPrint = 0;
-	int index = sourceData.size() - 1;
+
+    if(sourceData.size() > 0){
+        progressBar.reset();
+        progressBar.setMax(sourceData.size() - 1);
+    }
+
 	for (unsigned int i = 0; i < sourceData.size(); i++)
     {
+        progressBar.updateProgress(i);
 		// Check that the encTitleKey isn't null
 		if (sourceData[i]["encTitleKey"].isNull())
 		{
@@ -267,6 +282,7 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 		titleType = sourceData[i]["titleID"].asString().substr(4,4);
 
 		isNotSystemTitle = (titleType == ESHOP_GAMEAPP or titleType == ESHOP_DLC or titleType == ESHOP_DSIWARE);
+
         if (
                 ctitleId == NULL ||
                 cencTitleKey == NULL ||
@@ -303,98 +319,117 @@ void action_missing_tickets(std::vector<std::string> &vEncTitleKey, std::vector<
 				}
 			}
 		} else {
-
-			u64 curr;
+            u64 curr = strtoull(ctitleId, NULL, 16);
 
 			if (
                 (
                     (
-                        regionFilter != "REGION FREE" &&
-                        titleRegion != regionFilter &&
-                        titleRegion != "ALL" &&
-                        titleRegion != ""
-                    ) ||
-                    (
-                        regionFilter == "REGION FREE" &&
                         (
+                            regionFilter != "REGION FREE" &&
+                            titleRegion != regionFilter &&
                             titleRegion != "ALL" &&
                             titleRegion != ""
+                        ) ||
+                        (
+                            regionFilter == "REGION FREE" &&
+                            (
+                                titleRegion != "ALL" &&
+                                titleRegion != ""
+                            )
                         )
-                    )
-                ) ||
-                regionFilter == "ALL"
+                    ) ||
+                    regionFilter == "ALL"
+                ) && !is_game_installed(&curr)
             )
 			{
 				// If region matches selection and it not a system title
 				if (is_ticket_installed(vNANDTiks, titleId)==true)
                 {
 					n++;
-					curr = strtoull(ctitleId, NULL, 16) ;
-					AM_DeleteTicket(curr);
+
+                    vTitleID.push_back(titleId);
 				}
 			}
-
-			int delprogress = i*100/index;
-			if (
-                (
-                    delprogress % 10 == 0 &&
-                    delprogress > dellastPrint
-                ) ||
-                (
-                    delprogress == 0 &&
-                    dellastPrint == 0
-                )
-            )
-            {
-				printf("%d%% ", delprogress);
-				dellastPrint = delprogress+1;
-			}
 		}
+
 	}
+
+    if (sourceData.size() > 0){
+        printf("\n\n");
+    }
 
 	if (del==false)
     {
-		printf("Missing tickets: %d\n\n", n);
+		printf("Missing tickets: %d", n);
 	}
     else if (del==true)
     {
-		printf("100%%\n\n");
-		printf("Deleted tickets: %d\n\n", n);
+		printf("Tickets to delete: %d", n);
 	}
 }
 
-void action_install(std::vector<std::string> vEncTitleKey,std::vector<std::string> vTitleID, int index)
+void action_delete(std::vector<std::string> vTitleID)
 {
-	printf("Installing missing tickets...\n\n");
-	char titleVersion[2] = {0x00, 0x00};
-	Handle hTik;
-	u32 writtenbyte;
-	int instlastPrint = 0;
-	for (unsigned int i =0; i < vTitleID.size(); i++)
-	{
+    if(vTitleID.size() > 0)
+    {
+    	printf("\n\nRemoving out of region tickets...\n\n");
+        progressBar.reset();
+        progressBar.setMax(vTitleID.size() - 1);
 
-		AM_InstallTicketBegin(&hTik);
-		std::string curr = GetTicket(vTitleID.at(i), vEncTitleKey.at(i), titleVersion);
-		FSFILE_Write(hTik, &writtenbyte, 0, curr.c_str(), 0x150000, 0);
-		AM_InstallTicketFinish(hTik);
+    	for (unsigned int i =0; i < vTitleID.size(); i++)
+    	{
 
-		int instprogress = i*100/index;
-		if (
-            (
-                instprogress % 10 == 0 &&
-                instprogress > instlastPrint
-            ) ||
-            (
-                instprogress == 0 &&
-                instlastPrint == 0
-            )
-        )
-        {
-			printf("%d%% ", instprogress);
-			instlastPrint = instprogress+1;
-		}
-	}
-	printf("100%%\n\nDone!\n\n");
+            u64 curr = strtoull(vTitleID[i].c_str(), NULL, 16);
+    		AM_DeleteTicket(curr);
+
+    		progressBar.updateProgress(i);
+
+            hidScanInput();
+
+    		u32 keys = hidKeysDown();
+
+            if(keys == KEY_B){
+                printf("\n\nB button pressed, aborting...\n");
+                return;
+            }
+    	}
+    }
+	printf("\n\nDone!\n");
+}
+
+void action_install(std::vector<std::string> vEncTitleKey,std::vector<std::string> vTitleID)
+{
+    if(vTitleID.size() > 0)
+    {
+    	printf("\n\nInstalling missing tickets...\n\n");
+    	char titleVersion[2] = {0x00, 0x00};
+    	Handle hTik;
+    	u32 writtenbyte;
+
+        progressBar.reset();
+        progressBar.setMax(vTitleID.size() - 1);
+
+    	for (unsigned int i =0; i < vTitleID.size(); i++)
+    	{
+
+    		AM_InstallTicketBegin(&hTik);
+    		std::string curr = GetTicket(vTitleID.at(i), vEncTitleKey.at(i), titleVersion);
+    		FSFILE_Write(hTik, &writtenbyte, 0, curr.c_str(), 0x150000, 0);
+    		AM_InstallTicketFinish(hTik);
+
+    		progressBar.updateProgress(i);
+
+            hidScanInput();
+
+    		u32 keys = hidKeysDown();
+
+            if(keys == KEY_B){
+                printf("\n\nB button pressed, aborting...\n");
+                return;
+            }
+    	}
+    }
+	printf("\n\nDone!\n");
 }
 
 
@@ -510,8 +545,7 @@ int action_getconfirm(bool removing)
     {
         printf(CONSOLE_RED);
         printf("\nDanger, Will Robinson!");
-        printf("\nThis will remove ALL tickets");
-        printf("\nincluding ones for your region!" CONSOLE_RESET "\n");
+        printf("\nThis will remove all tickets not in use." CONSOLE_RESET "\n");
         printf("\nPress A to continue,\nor any other to cancel.\n\n");
 
         u32 keys = wait_key();
@@ -527,8 +561,8 @@ int action_getconfirm(bool removing)
     {
 		printf(CONSOLE_RED);
         printf("\nDanger, Will Robinson!");
-        printf("\nThis will remove everything except region free");
-        printf("\ntickets, this may include ones you have installed!" CONSOLE_RESET "\n");
+        printf("\nThis will remove all tickets not in use.\n");
+        printf("\nRegion free tickets will not be removed." CONSOLE_RESET "\n");
         printf("\nPress A to continue,\nor any other to cancel.\n\n");
 
         u32 keys = wait_key();
@@ -554,7 +588,7 @@ void select_oneclick()
 	std::vector<std::string> Regions;
 	int n;
 	action_missing_tickets(Keys, IDs, Regions, n, region, false);
-	action_install(Keys, IDs, n);
+	action_install(Keys, IDs);
 	printf("\nPress A to open eShop.");
 	printf("\nPress B to return to the main menu.");
 	while(true)
@@ -582,7 +616,7 @@ void select_removeout()
 	int n;
 
     action_missing_tickets(Keys, IDs, Regions, n, region, true);
-	printf("Done!");
+	action_delete(IDs);
 	wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
